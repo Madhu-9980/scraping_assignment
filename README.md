@@ -66,8 +66,8 @@ roughly **5–8 minutes**. Progress is printed to the console and written to
 
 ## 4. Run on GitHub Actions
 
-The `Run scraper` workflow runs the pipeline once a week (Sunday at 03:00 UTC)
-and can also be started manually:
+The `Run scraper` workflow runs the pipeline on every push to `main`, once a
+week (Sunday at 03:00 UTC), and can also be started manually:
 
 1. Push this repository to GitHub.
 2. Open the repository's **Actions** tab and select **Run scraper**.
