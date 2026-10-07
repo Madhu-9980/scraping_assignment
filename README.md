@@ -75,9 +75,11 @@ week (Sunday at 03:00 UTC), and can also be started manually:
 4. When the run succeeds, open it and download the **scraping-results** artifact.
 
 The artifact contains `final_dataset.csv`, `summary_report.json`, and
-`rejected_records.json`. It is retained for 14 days. The workflow uses a
-0.3-second request delay and Python 3.12. Generated files are not committed to
-the repository.
+`rejected_records.json`. It is retained for 14 days. To keep hosted runs quick,
+the workflow uses a 0.3-second request delay and skips book detail-page
+enrichment, so book category and description fields are empty. Local runs of
+`python main.py` still perform the full scrape by default. Generated files are
+not committed to the repository.
 
 ## 5. Project structure
 
