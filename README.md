@@ -81,6 +81,9 @@ enrichment, so book category and description fields are empty. Local runs of
 `python main.py` still perform the full scrape by default. Generated files are
 not committed to the repository.
 
+The latest successful scrape is also published as a public website at
+<https://madhu-9980.github.io/scraping_assignment/>.
+
 ## 5. Project structure
 
 ```

@@ -10,6 +10,8 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 jobs:
   scrape:
@@ -33,6 +35,15 @@ jobs:
       - name: Run scraping pipeline
         run: python main.py --delay 0.3 --skip-details
 
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Prepare public results page
+        run: |
+          mkdir -p site
+          cp output/final_dataset.csv output/summary_report.json site/
+          cp index.html site/
+
       - name: Upload scraping results
         uses: actions/upload-artifact@v4
         with:
@@ -43,3 +54,12 @@ jobs:
             output/rejected_records.json
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload public site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy public site
+        id: deployment
+        uses: actions/deploy-pages@v4

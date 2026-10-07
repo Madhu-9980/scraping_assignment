@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101827">
+    <title>Scraping Results</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #172033;
+        background: #f4f6fa;
+        font-synthesis: none;
+      }
+
+      * { box-sizing: border-box; }
+
+      body { margin: 0; }
+
+      header {
+        padding: 40px max(24px, calc((100vw - 1200px) / 2));
+        color: #fff;
+        background: #101827;
+      }
+
+      header p { margin: 8px 0 0; color: #b8c4d8; }
+      h1 { margin: 0; font-size: clamp(1.8rem, 4vw, 2.5rem); }
+      main { max-width: 1200px; margin: 28px auto; padding: 0 20px 40px; }
+
+      .toolbar, .stats, .pagination {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .stats { justify-content: flex-start; flex-wrap: wrap; margin: 20px 0; }
+      .card, .table-wrap { border: 1px solid #e1e6ef; border-radius: 12px; background: #fff; }
+      .card { min-width: 180px; padding: 16px 18px; }
+      .card span { display: block; color: #65718a; font-size: .85rem; }
+      .card strong { display: block; margin-top: 5px; font-size: 1.3rem; }
+      .toolbar { flex-wrap: wrap; margin: 20px 0 12px; }
+      .toolbar label { display: flex; align-items: center; gap: 8px; }
+
+      input, select, button, .download {
+        min-height: 40px;
+        padding: 8px 12px;
+        border: 1px solid #cbd3e0;
+        border-radius: 8px;
+        background: #fff;
+        color: inherit;
+        font: inherit;
+      }
+
+      input { width: min(360px, 70vw); }
+      button, .download { cursor: pointer; text-decoration: none; }
+      button:disabled { cursor: not-allowed; opacity: .45; }
+      .download { border-color: #263b65; background: #263b65; color: #fff; }
+      .table-wrap { overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; text-align: left; }
+      th, td { padding: 12px 14px; border-bottom: 1px solid #edf0f5; vertical-align: top; }
+      th { background: #f8f9fc; color: #536079; font-size: .8rem; text-transform: uppercase; }
+      td { max-width: 300px; overflow-wrap: anywhere; font-size: .92rem; }
+      tbody tr:last-child td { border-bottom: 0; }
+      td a { color: #2457a7; }
+      .pagination { justify-content: flex-end; margin-top: 14px; color: #65718a; }
+      .message { padding: 24px; color: #65718a; text-align: center; }
+      .notice { margin: 12px 0; color: #65718a; font-size: .9rem; }
+
+      @media (max-width: 600px) {
+        header { padding: 30px 20px; }
+        .toolbar, .toolbar label { align-items: stretch; flex-direction: column; }
+        input { width: 100%; }
+        .card { flex: 1; min-width: 140px; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Scraping Results</h1>
+      <p>Books and quotes gathered from public practice websites.</p>
+    </header>
+    <main>
+      <section class="stats" aria-label="Scrape summary">
+        <div class="card"><span>Records</span><strong id="record-count">Loading...</strong></div>
+        <div class="card"><span>Generated</span><strong id="generated-at">Loading...</strong></div>
+        <div class="card"><span>Sources</span><strong id="source-count">Loading...</strong></div>
+      </section>
+      <p class="notice">Book category and description are omitted in the hosted quick scrape.</p>
+      <div class="toolbar">
+        <label>Search records <input id="search" type="search" placeholder="Search titles, authors, tags..."></label>
+        <label>Source
+          <select id="source-filter"><option value="">All sources</option></select>
+        </label>
+        <a class="download" href="./final_dataset.csv" download>Download CSV</a>
+        <a href="./summary_report.json" download>Download summary</a>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Source</th><th>Title / Quote</th><th>Category</th><th>Price</th>
+              <th>Rating</th><th>Author</th><th>Tags</th>
+            </tr>
+          </thead>
+          <tbody id="results"><tr><td class="message" colspan="7">Loading results...</td></tr></tbody>
+        </table>
+      </div>
+      <nav class="pagination" aria-label="Result pages">
+        <span id="page-status"></span>
+        <button id="previous" type="button" disabled>Previous</button>
+        <button id="next" type="button" disabled>Next</button>
+      </nav>
+    </main>
+    <script>
+      const pageSize = 25;
+      const columns = ["source", "name_or_title", "category", "price", "rating", "author", "tags"];
+      let records = [];
+      let page = 0;
+
+      function parseCsv(text) {
+        const rows = [];
+        let row = [];
+        let field = "";
+        let quoted = false;
+
+        for (let i = 0; i < text.length; i += 1) {
+          const char = text[i];
+          if (quoted) {
+            if (char === '"' && text[i + 1] === '"') {
+              field += '"';
+              i += 1;
+            } else if (char === '"') {
+              quoted = false;
+            } else {
+              field += char;
+            }
+          } else if (char === '"') {
+            quoted = true;
+          } else if (char === ",") {
+            row.push(field);
+            field = "";
+          } else if (char === "\n") {
+            row.push(field.replace(/\r$/, ""));
+            rows.push(row);
+            row = [];
+            field = "";
+          } else {
+            field += char;
+          }
+        }
+
+        if (field || row.length) {
+          row.push(field.replace(/\r$/, ""));
+          rows.push(row);
+        }
+
+        const headers = rows.shift() || [];
+        return rows.filter((values) => values.some(Boolean)).map((values) =>
+          Object.fromEntries(headers.map((header, index) => [header, values[index] || ""]))
+        );
+      }
+
+      function filteredRecords() {
+        const term = document.querySelector("#search").value.trim().toLocaleLowerCase();
+        const source = document.querySelector("#source-filter").value;
+        return records.filter((record) =>
+          (!source || record.source === source) &&
+          (!term || Object.values(record).some((value) => value.toLocaleLowerCase().includes(term)))
+        );
+      }
+
+      function render() {
+        const filtered = filteredRecords();
+        const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+        page = Math.min(page, pages - 1);
+        const visible = filtered.slice(page * pageSize, (page + 1) * pageSize);
+        const body = document.querySelector("#results");
+        body.replaceChildren();
+
+        if (!visible.length) {
+          const row = body.insertRow();
+          const cell = row.insertCell();
+          cell.colSpan = columns.length;
+          cell.className = "message";
+          cell.textContent = "No matching records.";
+        } else {
+          visible.forEach((record) => {
+            const row = body.insertRow();
+            columns.forEach((column) => {
+              const cell = row.insertCell();
+              const value = record[column] || "";
+              if (column === "name_or_title" && record.source_url) {
+                try {
+                  const url = new URL(record.source_url);
+                  if (url.protocol === "http:" || url.protocol === "https:") {
+                    const link = document.createElement("a");
+                    link.href = url.href;
+                    link.target = "_blank";
+                    link.rel = "noopener noreferrer";
+                    link.textContent = value;
+                    cell.append(link);
+                    return;
+                  }
+                } catch {
+                  // Show the title as plain text if the source URL is invalid.
+                }
+              }
+              cell.textContent = value;
+            });
+          });
+        }
+
+        document.querySelector("#page-status").textContent =
+          `${filtered.length.toLocaleString()} records · Page ${page + 1} of ${pages}`;
+        document.querySelector("#previous").disabled = page === 0;
+        document.querySelector("#next").disabled = page >= pages - 1;
+      }
+
+      async function load() {
+        const [csvResponse, summaryResponse] = await Promise.all([
+          fetch("./final_dataset.csv"),
+          fetch("./summary_report.json")
+        ]);
+        if (!csvResponse.ok || !summaryResponse.ok) {
+          throw new Error("The latest scrape results could not be loaded.");
+        }
+
+        records = parseCsv(await csvResponse.text());
+        const summary = await summaryResponse.json();
+        document.querySelector("#record-count").textContent = records.length.toLocaleString();
+        document.querySelector("#generated-at").textContent = summary.generated_at || "Unknown";
+        const sources = [...new Set(records.map((record) => record.source).filter(Boolean))];
+        document.querySelector("#source-count").textContent = sources.length.toString();
+        const filter = document.querySelector("#source-filter");
+        sources.forEach((source) => {
+          const option = document.createElement("option");
+          option.value = source;
+          option.textContent = source;
+          filter.append(option);
+        });
+        render();
+      }
+
+      document.querySelector("#search").addEventListener("input", () => { page = 0; render(); });
+      document.querySelector("#source-filter").addEventListener("change", () => { page = 0; render(); });
+      document.querySelector("#previous").addEventListener("click", () => { page -= 1; render(); });
+      document.querySelector("#next").addEventListener("click", () => { page += 1; render(); });
+      load().catch((error) => {
+        document.querySelector("#record-count").textContent = "Unavailable";
+        document.querySelector("#generated-at").textContent = "Unavailable";
+        document.querySelector("#source-count").textContent = "Unavailable";
+        const cell = document.querySelector("#results").querySelector("td");
+        cell.textContent = error.message;
+      });
+    </script>
+  </body>
+</html>
