@@ -64,7 +64,22 @@ A full run performs ~1,100 requests at a polite 0.15 s interval and finishes in
 roughly **5–8 minutes**. Progress is printed to the console and written to
 `logs/pipeline.log`.
 
-## 4. Project structure
+## 4. Run on GitHub Actions
+
+The `Run scraper` workflow runs the pipeline once a week (Sunday at 03:00 UTC)
+and can also be started manually:
+
+1. Push this repository to GitHub.
+2. Open the repository's **Actions** tab and select **Run scraper**.
+3. To start a run immediately, choose **Run workflow** and confirm.
+4. When the run succeeds, open it and download the **scraping-results** artifact.
+
+The artifact contains `final_dataset.csv`, `summary_report.json`, and
+`rejected_records.json`. It is retained for 14 days. The workflow uses a
+0.3-second request delay and Python 3.12. Generated files are not committed to
+the repository.
+
+## 5. Project structure
 
 ```
 scraping_assignment/
@@ -96,7 +111,7 @@ scraping_assignment/
 only *transforms* them (pure functions, no I/O → easy to unit test); `main.py`
 orchestrates and writes outputs.
 
-## 5. How pagination works
+## 6. How pagination works
 
 Neither source's page URLs are hard-coded. Each scraper follows the site's
 "Next" link until it disappears:
@@ -111,7 +126,7 @@ Neither source's page URLs are hard-coded. Each scraper follows the site's
 Safety: a `MAX_PAGES_PER_SOURCE` cap (60) guarantees that a broken "next" link
 can never cause an infinite loop; `--max-pages` can lower it from the CLI.
 
-## 6. Data model (standardised schema)
+## 7. Data model (standardised schema)
 
 One row shape for both sources — `output/final_dataset.csv`:
 
@@ -133,7 +148,7 @@ invented**. `None` is used in Python and rendered as an empty CSV cell.
 An extra non-CSV field, `availability` ("In stock (22 available)"), is captured
 for books in memory but not part of the required schema.
 
-## 7. Source exploration notes (Step 1)
+## 8. Source exploration notes (Step 1)
 
 **Books to Scrape**
 
@@ -156,7 +171,7 @@ for books in memory but not part of the required schema.
   tags `div.tags a.tag`.
 * No price/rating/category → those columns stay empty.
 
-## 8. Cleaning approach (`processing/cleaning.py`)
+## 9. Cleaning approach (`processing/cleaning.py`)
 
 Pure functions, no I/O:
 
@@ -172,7 +187,7 @@ Pure functions, no I/O:
 A record that throws during cleaning is skipped and logged — the pipeline never
 stops on one bad row.
 
-## 9. Validation approach (`processing/validation.py`)
+## 10. Validation approach (`processing/validation.py`)
 
 Runs after cleaning, before deduplication. `validate_record()` returns a list
 of reasons (empty = valid):
@@ -186,7 +201,7 @@ Rejected records are **not written to the final dataset**. They are exported to
 `output/rejected_records.json` with their reasons, and a per-reason breakdown
 appears in `summary_report.json` (`rejection_reasons_breakdown`).
 
-## 10. Deduplication approach (`processing/deduplication.py`)
+## 11. Deduplication approach (`processing/deduplication.py`)
 
 Duplicate key = **`source` + normalised `name_or_title`** (book title / quote
 text) — the only stable identity field that exists for *both* sources.
@@ -215,7 +230,7 @@ contains `duplicate_records_detected` / `duplicate_records_removed` plus a
 happen to contain few natural duplicates. First occurrence wins; the rest are
 dropped.
 
-## 11. Error handling & logging
+## 12. Error handling & logging
 
 * **Transport:** `HttpFetcher` (`scrapers/base.py`) wraps a `requests.Session`
   with a 10 s timeout and **3 retries with exponential backoff**
